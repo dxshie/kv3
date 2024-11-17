@@ -3,6 +3,8 @@ name = "kv3"
 version = "0.1.0"
 edition = "2021"
 authors = ["dxshie <dxshie@revision.pub>"]
+description = "kv3 (keyvalues 3) format parser with serde support"
+license = "GNU GENERAL PUBLIC LICENSE"
 
 [features]
 default = ["serde"]
