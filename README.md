@@ -26,4 +26,4 @@ Add `kv3` to your `Cargo.toml` dependencies:
 
 ```toml
 [dependencies]
-kv3 = { git = "https://github.com/yourusername/kv3", features = ["serde"] }
+kv3 = { git = "https://github.com/dxshie/kv3", features = ["serde"] }

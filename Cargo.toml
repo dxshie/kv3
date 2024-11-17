@@ -2,6 +2,7 @@
 name = "kv3"
 version = "0.1.0"
 edition = "2021"
+authors = ["dxshie <dxshie@revision.pub>"]
 
 [features]
 default = ["serde"]
