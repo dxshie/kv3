@@ -5,15 +5,7 @@ edition = "2021"
 authors = ["dxshie <dxshie@revision.pub>"]
 description = "kv3 (keyvalues 3) format parser with serde support"
 license = "GPL-3.0-only"
-keywords = [
-    "serde",
-    "serialization",
-    "parser",
-    "valve",
-    "key value",
-    "format",
-    "kv3",
-]
+keywords = ["serde", "serialization", "parser", "valve", "kv3"]
 readme = "README.md"
 repository = "https://github.com/dxshie/kv3"
 
