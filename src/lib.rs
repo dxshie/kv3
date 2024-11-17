@@ -17,29 +17,27 @@
 //! ```rust
 //! use kv3::parse_kv3;
 //!
-//! fn main() {
-//!     let input = r#"
-//!     {
-//!         // comment
-//!         number = 5
-//!         floating = 5.0
-//!         array = []
-//!         obj = {}
-//!         string = "asd"
-//!         multiLineStringValue = """
-//!     First line of a multi-line string literal.
-//!     Second line of a multi-line string literal.
-//!     """
-//!     }
-//!     "#;
+//! let input = r#"
+//! {
+//!     // comment
+//!     number = 5
+//!     floating = 5.0
+//!     array = []
+//!     obj = {}
+//!     string = "asd"
+//!     multiLineStringValue = """
+//! First line of a multi-line string literal.
+//! Second line of a multi-line string literal.
+//! """
+//! }
+//! "#;
 //!
-//!     match parse_kv3(input) {
-//!         Ok((_, kvs)) => {
-//!             println!("Parsed KV3: {:#?}", kvs);
-//!         }
-//!         Err(e) => {
-//!             eprintln!("Error parsing KV3: {:?}", e);
-//!         }
+//! match parse_kv3(input) {
+//!     Ok((_, kvs)) => {
+//!         println!("Parsed KV3: {:#?}", kvs);
+//!     }
+//!     Err(e) => {
+//!         eprintln!("Error parsing KV3: {:?}", e);
 //!     }
 //! }
 //! ```
@@ -155,9 +153,9 @@ fn skip_comments_and_whitespace(input: &str) -> IResult<&str, ()> {
     )(input)
 }
 
-fn ws<'a, F: 'a, O>(inner: F) -> impl Fn(&'a str) -> IResult<&'a str, O>
+fn ws<'a, F, O>(inner: F) -> impl Fn(&'a str) -> IResult<&'a str, O>
 where
-    F: Fn(&'a str) -> IResult<&'a str, O>,
+    F: 'a + Fn(&'a str) -> IResult<&'a str, O>,
 {
     move |input: &str| {
         let (input, _) = skip_comments_and_whitespace(input)?;

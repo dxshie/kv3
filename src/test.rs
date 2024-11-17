@@ -9,6 +9,7 @@ mod tests {
     #[derive(Deserialize, Serialize)]
     struct TestNestedObj {
         obj: NestedObj,
+        data: i32,
     }
 
     #[derive(Deserialize, Serialize)]
@@ -19,33 +20,41 @@ mod tests {
     #[test]
     fn kv3_serde_parse_object_nested() {
         let input = r#"
-    <!-- test 3 -->
 {
-  // comment
+  data = 5
   obj = {
-    obj1 = {}
+    obj1 = {
+      data = 5
+    }
   }
 }
 "#;
 
         match serde_kv3::<TestNestedObj>(input) {
-            Ok(_) => {}
+            Ok(data) => {
+                assert_eq!(data.data, 5);
+            }
             Err(e) => {
                 error!("error {:?}", e);
-                assert!(true)
+                panic!("expected to pass the test")
             }
         }
     }
 
     #[derive(Deserialize, Serialize)]
-    struct SomeObj;
+    struct SomeObj {
+        data: i32,
+    }
+
+    #[derive(Deserialize, Serialize)]
+    struct SomeObjEmpty {}
 
     #[derive(Deserialize, Serialize)]
     struct ObjTest {
-        obj1: SomeObj,
-        obj2: SomeObj,
-        obj3: SomeObj,
-        obj4: SomeObj,
+        obj1: SomeObjEmpty,
+        obj2: SomeObjEmpty,
+        obj3: SomeObjEmpty,
+        obj4: SomeObjEmpty,
     }
 
     #[test]
@@ -68,7 +77,7 @@ mod tests {
             Ok(_) => {}
             Err(e) => {
                 error!("error {:?}", e);
-                assert!(true)
+                panic!("expected to pass the test")
             }
         }
     }
@@ -84,24 +93,23 @@ mod tests {
     #[test]
     fn kv3_serde_parse_array_faulty() {
         let input = r#"
-    <!-- test 3 -->
-{
-  // comment
-  array1 = []
-  array2 = [ ]
-  array3 = [
-  ]
-  array4 = asd
-  [
-  ]
-}
-"#;
+         <!-- test 3 -->
+     {
+       // comment
+       array1 = []
+       array2 = [ ]
+       array3 = [
+       ]
+       array4 = asd
+       [
+       ]
+     }
+     "#;
 
         match serde_kv3::<ArrayTest>(input) {
             Ok(_) => {}
             Err(e) => {
                 error!("error {:?}", e);
-                assert!(true)
             }
         }
     }
@@ -109,24 +117,24 @@ mod tests {
     #[test]
     fn kv3_serde_parse_array() {
         let input = r#"
-    <!-- test 3 -->
-{
-  // comment
-  array1 = []
-  array2 = [ ]
-  array3 = [
-  ]
-  array4 = 
-  [
-  ]
-}
-"#;
+         <!-- test 3 -->
+     {
+       // comment
+       array1 = []
+       array2 = [ ]
+       array3 = [
+       ]
+       array4 =
+       [
+       ]
+     }
+     "#;
 
         match serde_kv3::<ArrayTest>(input) {
             Ok(_) => {}
             Err(e) => {
                 error!("error {:?}", e);
-                assert!(false)
+                panic!("expected to pass the test")
             }
         }
     }
@@ -142,23 +150,23 @@ mod tests {
     #[test]
     fn kv3_serde_parse_input_numbers() {
         let input = r#"
-         <!-- test 3 -->
-     {
-       m_nFlags = 5.0
-       m_nRefCounter = 5
-       m_string = "some string"
-        multiLineStringValue = """
-First line of a multi-line string literal.
-Second line of a multi-line string literal.
-"""
-     }
-     "#;
+              <!-- test 3 -->
+          {
+            m_nFlags = 5.0
+            m_nRefCounter = 5
+            m_string = "some string"
+             multiLineStringValue = """
+     First line of a multi-line string literal.
+     Second line of a multi-line string literal.
+     """
+          }
+          "#;
 
         match serde_kv3::<Test>(input) {
             Ok(_) => {}
             Err(e) => {
                 error!("error {:?}", e);
-                assert!(false)
+                panic!("expected to pass the test")
             }
         }
     }
@@ -172,24 +180,24 @@ Second line of a multi-line string literal.
     #[test]
     fn kv3_serde_parse_input_comments() {
         let input = r#"
-         <!-- test 3 -->
-     {
-         // test 2
-         <!-- test 3 -->
-         array1 = [1] // test
-         num = 5 /*
-         ok
-         */
-         float = 5.0
-         obj = {}
-     }
-     "#;
+              <!-- test 3 -->
+          {
+              // test 2
+              <!-- test 3 -->
+              array1 = [1] // test
+              num = 5 /*
+              ok
+              */
+              float = 5.0
+              obj = {}
+          }
+          "#;
 
         match serde_kv3::<Test2>(input) {
             Ok(_) => {}
             Err(e) => {
                 error!("error {:?}", e);
-                assert!(false)
+                panic!("expected to pass the test")
             }
         }
     }
