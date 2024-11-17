@@ -106,6 +106,7 @@ pub struct KV3Object {
 }
 
 #[cfg(not(feature = "serde"))]
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct KV3Object {
     fields: HashMap<String, KV3Value>,
