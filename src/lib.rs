@@ -1,20 +1,79 @@
-mod kv3_serde;
+//! # kv3
+//!
+//! A Rust crate for parsing Valve's KeyValues3 (KV3) format.
+//!
+//! This crate provides functionality to parse and serialize the KeyValues3 format used by Valve in their games and tools.
+//!
+//! ## Features
+//!
+//! - **Parsing**: Convert KV3-formatted strings into Rust data structures.
+//! - **Support for Comments**: Handles single-line (`//`), multi-line (`/* ... */`), and XML-style (`<!-- ... -->`) comments.
+//! - **Support for Multiline Strings**: Parses multiline strings enclosed in triple double-quotes (`"""`).
+//! - **Handles Various Data Types**: Supports booleans, integers, floats, strings, arrays, hex arrays, objects, and null values.
+//! - **Customizable Parsing**: Built using the [`nom`](https://github.com/Geal/nom) parser combinator library for flexibility.
+//!
+//! ## Example
+//!
+//! ```rust
+//! use kv3::parse_kv3;
+//!
+//! fn main() {
+//!     let input = r#"
+//!     {
+//!         // comment
+//!         number = 5
+//!         floating = 5.0
+//!         array = []
+//!         obj = {}
+//!         string = "asd"
+//!         multiLineStringValue = """
+//!     First line of a multi-line string literal.
+//!     Second line of a multi-line string literal.
+//!     """
+//!     }
+//!     "#;
+//!
+//!     match parse_kv3(input) {
+//!         Ok((_, kvs)) => {
+//!             println!("Parsed KV3: {:#?}", kvs);
+//!         }
+//!         Err(e) => {
+//!             eprintln!("Error parsing KV3: {:?}", e);
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! ## KeyValues3 Format
+//!
+//! For more information about the KeyValues3 format, please refer to the [Valve Developer Community Wiki](https://developer.valvesoftware.com/wiki/KeyValues3).
+//!
+//! ## License
+//!
+//! This project is licensed under the MIT License.
+//!
+
+#[cfg(feature = "serde")]
+pub mod kv3_serde;
+
 mod test;
 
 use log::{debug, error, info};
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while},
-    character::complete::{digit1, multispace0},
-    combinator::{map, opt},
+    character::complete::multispace1,
+    combinator::map,
     multi::{many0, separated_list0},
     number::complete::recognize_float,
-    sequence::{delimited, preceded, separated_pair, terminated},
+    sequence::{delimited, preceded, separated_pair},
     IResult,
 };
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[cfg(feature = "serde")]
 #[derive(Debug, Serialize)]
 pub enum KV3Value {
     Bool(bool),
@@ -27,7 +86,27 @@ pub enum KV3Value {
     Null,
 }
 
+#[cfg(not(feature = "serde"))]
+#[derive(Debug)]
+pub enum KV3Value {
+    Bool(bool),
+    Int(i64),
+    Double(f64),
+    String(String),
+    Array(Vec<KV3Value>),
+    HexArray(Vec<u8>), // New variant for hexadecimal arrays
+    Object(KV3Object),
+    Null,
+}
+
+#[cfg(feature = "serde")]
 #[derive(Debug, Serialize, Deserialize)]
+pub struct KV3Object {
+    fields: HashMap<String, KV3Value>,
+}
+
+#[cfg(not(feature = "serde"))]
+#[derive(Debug)]
 pub struct KV3Object {
     fields: HashMap<String, KV3Value>,
 }
@@ -35,13 +114,9 @@ pub struct KV3Object {
 pub fn parse_kv3(input: &str) -> IResult<&str, HashMap<String, KV3Value>> {
     info!("Parsing KV3 root...");
 
-    // Skip initial comments and whitespace
-    let (remaining, _) = skip_comments(input)?;
-
-    // Parse the main object
-    let (remaining, _) = preceded(multispace0, tag("{"))(remaining)?;
-    let (remaining, kvs) = many0(preceded(multispace0, parse_key_value))(remaining)?;
-    let (remaining, _) = preceded(multispace0, tag("}"))(remaining)?;
+    let (remaining, _) = ws(tag("{"))(input)?;
+    let (remaining, kvs) = many0(ws(parse_key_value))(remaining)?;
+    let (remaining, _) = ws(tag("}"))(remaining)?;
 
     debug!("Parsed KV3 root successfully: {:#?}", kvs);
     debug!("Remaining input: {:?}", remaining);
@@ -71,11 +146,24 @@ fn parse_comment(input: &str) -> IResult<&str, ()> {
     // Combine all comment formats
     alt((single_line, multi_line, xml_style))(input)
 }
-fn skip_comments(input: &str) -> IResult<&str, ()> {
+
+fn skip_comments_and_whitespace(input: &str) -> IResult<&str, ()> {
     map(
-        many0(preceded(multispace0, parse_comment)), // Skip comments and surrounding whitespace
-        |_| (),                                      // Ignore results
+        many0(alt((map(multispace1, |_| ()), parse_comment))),
+        |_| (),
     )(input)
+}
+
+fn ws<'a, F: 'a, O>(inner: F) -> impl Fn(&'a str) -> IResult<&'a str, O>
+where
+    F: Fn(&'a str) -> IResult<&'a str, O>,
+{
+    move |input: &str| {
+        let (input, _) = skip_comments_and_whitespace(input)?;
+        let (input, res) = inner(input)?;
+        let (input, _) = skip_comments_and_whitespace(input)?;
+        Ok((input, res))
+    }
 }
 
 fn parse_number_or_float(input: &str) -> IResult<&str, KV3Value> {
@@ -94,20 +182,20 @@ fn parse_number_or_float(input: &str) -> IResult<&str, KV3Value> {
 }
 
 fn parse_key_value(input: &str) -> IResult<&str, (String, KV3Value)> {
-    info!("Parsing key-value pair...");
-    let result = separated_pair(
-        parse_key,
-        preceded(multispace0, tag("=")),
-        preceded(multispace0, parse_value),
-    )(input);
+    debug!("Parsing key-value pair...");
+    let result = separated_pair(ws(parse_key), ws(tag("=")), ws(parse_value))(input);
 
     match &result {
         Ok((remaining, (key, value))) => {
             debug!("Parsed key-value pair: key = {}, value = {:?}", key, value);
             debug!("Remaining input: {:?}", remaining);
         }
-        Err(e) => {
+        Err(nom::Err::Failure(e)) => {
+            // Only log errors of type `Failure`
             error!("Error parsing key-value pair: {:?}", e);
+        }
+        _ => {
+            // Do not log other types of errors
         }
     }
 
@@ -134,11 +222,46 @@ fn parse_key(input: &str) -> IResult<&str, String> {
     result
 }
 
-fn parse_float(input: &str) -> IResult<&str, f64> {
-    preceded(
-        multispace0,
-        map(recognize_float, |s: &str| s.parse::<f64>().unwrap()),
-    )(input)
+fn parse_value(input: &str) -> IResult<&str, KV3Value> {
+    alt((
+        map(tag("false"), |_| KV3Value::Bool(false)),
+        map(tag("true"), |_| KV3Value::Bool(true)),
+        map(tag("null"), |_| KV3Value::Null),
+        map(parse_string, KV3Value::String),
+        parse_number_or_float,
+        parse_array,
+        parse_hex_array,
+        parse_object,
+    ))(input)
+}
+
+fn parse_string(input: &str) -> IResult<&str, String> {
+    info!("Parsing string...");
+
+    // Parser for multiline strings
+    let parse_multiline_string = delimited(tag("\"\"\""), take_until("\"\"\""), tag("\"\"\""));
+
+    // Parser for single-line strings
+    let parse_single_line_string = delimited(tag("\""), take_until("\""), tag("\""));
+
+    // Try to parse a multiline string first, then a single-line string
+    let result = alt((parse_multiline_string, parse_single_line_string))(input);
+
+    if let Ok((remaining, string)) = &result {
+        debug!("Parsed string: {}", string);
+        debug!("Remaining input: {:?}", remaining);
+    }
+
+    result.map(|(remaining, s)| (remaining, s.to_string()))
+}
+
+fn parse_array(input: &str) -> IResult<&str, KV3Value> {
+    info!("Parsing array...");
+
+    let parse_elements = separated_list0(ws(tag(",")), ws(parse_value));
+    let result = delimited(ws(tag("[")), parse_elements, ws(tag("]")))(input);
+
+    result.map(|(remaining, fields)| (remaining, KV3Value::Array(fields)))
 }
 
 fn parse_hex_array(input: &str) -> IResult<&str, KV3Value> {
@@ -154,89 +277,13 @@ fn parse_hex_array(input: &str) -> IResult<&str, KV3Value> {
         tag("]"),
     )(input);
 
-    match &result {
-        Ok((remaining, bytes)) => {
-            debug!("Parsed hex array: {:?}", bytes);
-            debug!("Remaining input: {:?}", remaining);
-        }
-        Err(e) => {
-            error!("Error parsing hex array: {:?}", e);
-        }
-    }
-
     result.map(|(remaining, bytes)| (remaining, KV3Value::HexArray(bytes)))
-}
-
-fn parse_value(input: &str) -> IResult<&str, KV3Value> {
-    alt((
-        map(tag("false"), |_| KV3Value::Bool(false)),
-        map(tag("true"), |_| KV3Value::Bool(true)),
-        map(tag("null"), |_| KV3Value::Null),
-        map(parse_string, KV3Value::String),
-        parse_array,
-        parse_hex_array,
-        parse_object,
-        parse_number_or_float,
-    ))(input)
-}
-
-fn parse_string(input: &str) -> IResult<&str, String> {
-    info!("Parsing string...");
-    let result = delimited(tag("\""), take_until("\""), tag("\""))(input);
-
-    if let Ok((remaining, string)) = &result {
-        debug!("Parsed string: {}", string);
-        debug!("Remaining input: {:?}", remaining);
-    }
-
-    result.map(|(remaining, s)| (remaining, s.to_string()))
-}
-
-fn parse_array(input: &str) -> IResult<&str, KV3Value> {
-    info!("Parsing array...");
-
-    // Parse elements separated by commas, and allow an optional trailing comma
-    let parse_elements = separated_list0(
-        preceded(multispace0, tag(",")),
-        preceded(multispace0, parse_value),
-    );
-    let result = delimited(
-        preceded(multispace0, tag("[")),
-        terminated(parse_elements, opt(preceded(multispace0, tag(",")))), // Allow a trailing comma
-        preceded(multispace0, tag("]")),
-    )(input);
-
-    match &result {
-        Ok((remaining, elements)) => {
-            debug!("Parsed array: {:?}", elements);
-            debug!("Remaining input: {:?}", remaining);
-        }
-        Err(e) => {
-            error!("Error parsing array: {:?}", e);
-        }
-    }
-
-    result.map(|(remaining, fields)| (remaining, KV3Value::Array(fields)))
 }
 
 fn parse_object(input: &str) -> IResult<&str, KV3Value> {
     info!("Parsing object...");
-    let parse_fields = many0(preceded(multispace0, parse_key_value));
-    let result = delimited(
-        preceded(multispace0, tag("{")),
-        parse_fields,
-        preceded(multispace0, tag("}")),
-    )(input);
-
-    match &result {
-        Ok((remaining, fields)) => {
-            debug!("Parsed object: {:?}", fields);
-            debug!("Remaining input: {:?}", remaining);
-        }
-        Err(e) => {
-            error!("Error parsing object: {:?}", e);
-        }
-    }
+    let parse_fields = many0(ws(parse_key_value));
+    let result = delimited(ws(tag("{")), parse_fields, ws(tag("}")))(input);
 
     result.map(|(remaining, fields)| {
         (
@@ -246,21 +293,4 @@ fn parse_object(input: &str) -> IResult<&str, KV3Value> {
             }),
         )
     })
-}
-
-fn parse_number(input: &str) -> IResult<&str, i64> {
-    info!("Parsing number...");
-    let result = map(digit1, |s: &str| s.parse::<i64>().unwrap())(input);
-
-    match &result {
-        Ok((remaining, number)) => {
-            debug!("Parsed number: {}", number);
-            debug!("Remaining input: {:?}", remaining);
-        }
-        Err(e) => {
-            error!("Error parsing number: {:?}", e);
-        }
-    }
-
-    result
 }

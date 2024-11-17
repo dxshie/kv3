@@ -121,6 +121,42 @@ impl<'de> serde::Deserializer<'de> for KV3Value {
     }
 }
 
+/// Parses your KV3 input data into a Rust structure.
+///
+/// # Example
+///
+/// ```rust
+/// use serde::Deserialize;
+/// use kv3::kv3_serde::serde_kv3;
+///
+/// #[derive(Debug, Deserialize)]
+/// struct MyStruct {
+///     name: String,
+///     value: i32,
+///     active: bool,
+/// }
+///
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let kv3_input = r#"
+///     {
+///         name = "Example"
+///         value = 42
+///         active = true
+///     }
+///     "#;
+///
+///     let my_struct: MyStruct = serde_kv3(kv3_input)?;
+///     println!("{:?}", my_struct);
+///     Ok(())
+/// }
+/// ```
+///
+/// This will output:
+///
+/// ```text
+/// MyStruct { name: "Example", value: 42, active: true }
+/// ```
+///
 pub fn serde_kv3<'de, T>(input: &'static str) -> Result<T, Box<dyn std::error::Error>>
 where
     T: Deserialize<'de>,
