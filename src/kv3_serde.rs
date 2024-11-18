@@ -157,7 +157,7 @@ impl<'de> serde::Deserializer<'de> for KV3Value {
 /// MyStruct { name: "Example", value: 42, active: true }
 /// ```
 ///
-pub fn serde_kv3<'de, T>(input: &'static str) -> Result<T, Box<dyn std::error::Error>>
+pub fn serde_kv3<'de, T>(input: &'de str) -> Result<T, Box<dyn std::error::Error + 'de>>
 where
     T: Deserialize<'de>,
 {
