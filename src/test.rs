@@ -4,7 +4,7 @@ mod tests {
     use log::{error, info};
     use serde::{Deserialize, Serialize};
 
-    use crate::{kv3_serde::serde_kv3, parse_kv3};
+    use crate::kv3_serde::serde_kv3;
 
     #[derive(Deserialize, Serialize)]
     struct TestNestedObj {
