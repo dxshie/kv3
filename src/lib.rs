@@ -61,10 +61,10 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while},
     character::complete::multispace1,
-    combinator::map,
+    combinator::{map, opt},
     multi::{many0, separated_list0},
     number::complete::recognize_float,
-    sequence::{delimited, preceded, separated_pair},
+    sequence::{delimited, pair, preceded, separated_pair},
     IResult,
 };
 #[cfg(feature = "serde")]
@@ -117,10 +117,21 @@ pub fn parse_kv3(input: &str) -> IResult<&str, HashMap<String, KV3Value>> {
     let (remaining, kvs) = many0(ws(parse_key_value))(remaining)?;
     let (remaining, _) = ws(tag("}"))(remaining)?;
 
-    debug!("Parsed KV3 root successfully: {:#?}", kvs);
-    debug!("Remaining input: {:?}", remaining);
+    debug!(
+        "Parsed KV3 root successfully: {:?}",
+        truncate_str(&format!("{:#?}", kvs), 100)
+    );
+    debug!("Remaining input: {}", truncate_str(remaining, 100));
 
     Ok((remaining, kvs.into_iter().collect()))
+}
+
+fn truncate_str(input: &str, max_length: usize) -> String {
+    if input.len() > max_length {
+        format!("{}... (truncated)", &input[..max_length])
+    } else {
+        input.to_string()
+    }
 }
 
 fn parse_comment(input: &str) -> IResult<&str, ()> {
@@ -166,17 +177,25 @@ where
 }
 
 fn parse_number_or_float(input: &str) -> IResult<&str, KV3Value> {
+    let input = input.trim_start(); // Trim leading whitespace
+
     let (remaining, num_str) = recognize_float(input)?;
     if num_str.contains('.') || num_str.contains('e') || num_str.contains('E') {
-        let float_value = num_str.parse::<f64>().map_err(|_| {
-            nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Float))
-        })?;
-        Ok((remaining, KV3Value::Double(float_value)))
+        // Parse as float
+        num_str
+            .parse::<f64>()
+            .map(|v| (remaining, KV3Value::Double(v)))
+            .map_err(|_| {
+                nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Float))
+            })
     } else {
-        let int_value = num_str.parse::<i64>().map_err(|_| {
-            nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
-        })?;
-        Ok((remaining, KV3Value::Int(int_value)))
+        // Parse as integer
+        num_str
+            .parse::<i64>()
+            .map(|v| (remaining, KV3Value::Int(v)))
+            .map_err(|_| {
+                nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+            })
     }
 }
 
@@ -186,15 +205,21 @@ fn parse_key_value(input: &str) -> IResult<&str, (String, KV3Value)> {
 
     match &result {
         Ok((remaining, (key, value))) => {
-            debug!("Parsed key-value pair: key = {}, value = {:?}", key, value);
-            debug!("Remaining input: {:?}", remaining);
+            debug!(
+                "Parsed key-value pair: key = {}, value = {:?}",
+                truncate_str(key, 50),
+                truncate_str(&format!("{:?}", value), 50)
+            );
+            debug!(
+                "Remaining input after key-value: {}",
+                truncate_str(remaining, 200)
+            );
         }
-        Err(nom::Err::Failure(e)) => {
-            // Only log errors of type `Failure`
-            error!("Error parsing key-value pair: {:?}", e);
-        }
-        _ => {
-            // Do not log other types of errors
+        Err(e) => {
+            error!(
+                "Error parsing key-value pair: {:?}",
+                truncate_str(e.to_string().as_str(), 200)
+            );
         }
     }
 
@@ -210,11 +235,14 @@ fn parse_key(input: &str) -> IResult<&str, String> {
 
     match &result {
         Ok((remaining, key)) => {
-            debug!("Parsed key: {}", key);
-            debug!("Remaining input: {:?}", remaining);
+            debug!("Parsed key: {}", truncate_str(key, 50));
+            debug!("Remaining input: {}", truncate_str(remaining, 200));
         }
         Err(e) => {
-            error!("Error parsing key: {:?}", e);
+            error!(
+                "Error parsing key: {:?}",
+                truncate_str(e.to_string().as_str(), 200)
+            );
         }
     }
 
@@ -223,14 +251,14 @@ fn parse_key(input: &str) -> IResult<&str, String> {
 
 fn parse_value(input: &str) -> IResult<&str, KV3Value> {
     alt((
+        parse_array, // Prioritize array parsing
+        parse_hex_array,
+        parse_object,
         map(tag("false"), |_| KV3Value::Bool(false)),
         map(tag("true"), |_| KV3Value::Bool(true)),
         map(tag("null"), |_| KV3Value::Null),
-        map(parse_string, KV3Value::String),
-        parse_number_or_float,
-        parse_array,
-        parse_hex_array,
-        parse_object,
+        parse_number_or_float,               // Parse numbers
+        map(parse_string, KV3Value::String), // Parse strings last
     ))(input)
 }
 
@@ -247,8 +275,8 @@ fn parse_string(input: &str) -> IResult<&str, String> {
     let result = alt((parse_multiline_string, parse_single_line_string))(input);
 
     if let Ok((remaining, string)) = &result {
-        debug!("Parsed string: {}", string);
-        debug!("Remaining input: {:?}", remaining);
+        debug!("Parsed string: {}", truncate_str(string, 50));
+        debug!("Remaining input: {}", truncate_str(remaining, 200));
     }
 
     result.map(|(remaining, s)| (remaining, s.to_string()))
@@ -257,10 +285,42 @@ fn parse_string(input: &str) -> IResult<&str, String> {
 fn parse_array(input: &str) -> IResult<&str, KV3Value> {
     info!("Parsing array...");
 
+    // Parse elements as KV3 values, separated by commas
     let parse_elements = separated_list0(ws(tag(",")), ws(parse_value));
-    let result = delimited(ws(tag("[")), parse_elements, ws(tag("]")))(input);
+    let mut array_parser = delimited(
+        ws(tag("[")), // Opening bracket
+        map(
+            // Wrap parsed elements in a vector
+            pair(parse_elements, opt(ws(tag(",")))), // Allow optional trailing comma
+            |(elements, _)| elements,                // Discard the optional trailing comma
+        ),
+        ws(tag("]")), // Closing bracket
+    );
 
-    result.map(|(remaining, fields)| (remaining, KV3Value::Array(fields)))
+    let result = array_parser(input);
+
+    // Log results or errors
+    match &result {
+        Ok((remaining, elements)) => {
+            debug!(
+                "Parsed array with {} elements: {:?}",
+                elements.len(),
+                truncate_str(&format!("{:?}", elements), 100)
+            );
+            debug!(
+                "Remaining input after array: {}",
+                truncate_str(remaining, 200)
+            );
+        }
+        Err(e) => {
+            error!(
+                "Error parsing array: {:?}",
+                truncate_str(e.to_string().as_str(), 200)
+            );
+        }
+    }
+
+    result.map(|(remaining, elements)| (remaining, KV3Value::Array(elements)))
 }
 
 fn parse_hex_array(input: &str) -> IResult<&str, KV3Value> {
@@ -283,6 +343,19 @@ fn parse_object(input: &str) -> IResult<&str, KV3Value> {
     info!("Parsing object...");
     let parse_fields = many0(ws(parse_key_value));
     let result = delimited(ws(tag("{")), parse_fields, ws(tag("}")))(input);
+
+    match &result {
+        Ok((remaining, key)) => {
+            debug!("Parsed object: {:?}", key);
+            debug!("Remaining input: {}", truncate_str(remaining, 200));
+        }
+        Err(e) => {
+            error!(
+                "Error parsing key: {:?}",
+                truncate_str(e.to_string().as_str(), 200)
+            );
+        }
+    }
 
     result.map(|(remaining, fields)| {
         (
