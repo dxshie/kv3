@@ -17,4 +17,3 @@ serde = ["dep:serde"]
 serde = { version = "1", features = ["derive"], optional = true }
 nom = { version = "7" }
 log = "0.4"
-env_logger = "0.11"
