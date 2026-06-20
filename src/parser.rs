@@ -31,8 +31,7 @@ impl KV3Error {
 
 type Extra<'src> = extra::Err<Rich<'src, char>>;
 
-fn document_parser<'src>(
-) -> impl Parser<'src, &'src str, HashMap<String, KV3Value>, Extra<'src>> {
+fn document_parser<'src>() -> impl Parser<'src, &'src str, HashMap<String, KV3Value>, Extra<'src>> {
     // --- whitespace + comments (pad) ---
     let line_comment = just("//")
         .then(any().and_is(just('\n').not()).repeated())
@@ -90,12 +89,7 @@ fn document_parser<'src>(
 
         // strings: prefer triple-quoted, fall back to single
         let multi_str = just("\"\"\"")
-            .ignore_then(
-                any()
-                    .and_is(just("\"\"\"").not())
-                    .repeated()
-                    .to_slice(),
-            )
+            .ignore_then(any().and_is(just("\"\"\"").not()).repeated().to_slice())
             .then_ignore(just("\"\"\""))
             .map(|s: &str| KV3Value::String(s.to_string()));
         let single_str = just('"')

@@ -398,9 +398,8 @@ mod tests {
             inner: InnerStruct { x: 1, y: 2 },
         };
         let serialized = to_kv3_string(&orig).expect("serialize");
-        let parsed: RoundTrip = serde_kv3(&serialized).unwrap_or_else(|e| {
-            panic!("re-parse failed: {}\n--- output ---\n{}", e, serialized)
-        });
+        let parsed: RoundTrip = serde_kv3(&serialized)
+            .unwrap_or_else(|e| panic!("re-parse failed: {}\n--- output ---\n{}", e, serialized));
         assert_eq!(orig, parsed);
     }
 
@@ -424,6 +423,10 @@ mod tests {
         };
         let out = to_kv3_string(&s).expect("serialize");
         // Re-parsing the output through the real parser is the strongest check.
-        assert!(crate::parse_kv3(&out).is_ok(), "output not parseable:\n{}", out);
+        assert!(
+            crate::parse_kv3(&out).is_ok(),
+            "output not parseable:\n{}",
+            out
+        );
     }
 }

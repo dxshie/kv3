@@ -42,7 +42,11 @@ pub struct KV3Error {
 
 impl fmt::Display for KV3Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "parse error at {}..{}: {}", self.span.start, self.span.end, self.message)
+        write!(
+            f,
+            "parse error at {}..{}: {}",
+            self.span.start, self.span.end, self.message
+        )
     }
 }
 

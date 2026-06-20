@@ -604,10 +604,9 @@ impl SerializeMap for MapBuilder {
     where
         T: Serialize + ?Sized,
     {
-        let key = self
-            .next_key
-            .take()
-            .ok_or_else(|| KV3SerError::Custom("serialize_value called before serialize_key".into()))?;
+        let key = self.next_key.take().ok_or_else(|| {
+            KV3SerError::Custom("serialize_value called before serialize_key".into())
+        })?;
         self.entries
             .insert(key, value.serialize(KV3ValueSerializer)?);
         Ok(())
