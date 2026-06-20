@@ -222,12 +222,6 @@ mod tests {
     }
 
     #[derive(Debug, Deserialize, Serialize)]
-    struct WorldPhys {
-        #[serde(rename = "m_nFlags")]
-        flags: i64,
-    }
-
-    #[derive(Debug, Deserialize, Serialize)]
     struct SerdeParseTest2 {
         #[serde(rename = "num")]
         num: i64,
