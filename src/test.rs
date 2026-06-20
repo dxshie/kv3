@@ -4,7 +4,7 @@ mod tests {
     use log::{error, info};
     use serde::{Deserialize, Serialize};
 
-    use crate::kv3_serde::serde_kv3;
+    use crate::kv3_serde::{serde_kv3, to_kv3_string};
 
     #[derive(Deserialize, Serialize)]
     struct TestNestedObj {
@@ -222,12 +222,6 @@ mod tests {
     }
 
     #[derive(Debug, Deserialize, Serialize)]
-    struct WorldPhys {
-        #[serde(rename = "m_nFlags")]
-        flags: i64,
-    }
-
-    #[derive(Debug, Deserialize, Serialize)]
     struct SerdeParseTest2 {
         #[serde(rename = "num")]
         num: i64,
@@ -347,5 +341,86 @@ mod tests {
                 panic!("expected to pass the test {:?}", e);
             }
         }
+    }
+
+    #[derive(Debug, Deserialize, Serialize, PartialEq)]
+    struct VecBlob {
+        data: Vec<u8>,
+    }
+
+    #[test]
+    fn kv3_serde_hex_array_into_vec_u8() {
+        let input = r#"
+        {
+            data = #[FF AB 00 1F]
+        }
+        "#;
+        let parsed: VecBlob = serde_kv3(input).expect("parse");
+        assert_eq!(parsed.data, vec![0xFF, 0xAB, 0x00, 0x1F]);
+    }
+
+    #[derive(Debug, Deserialize, Serialize, PartialEq)]
+    struct RoundTrip {
+        name: String,
+        count: i32,
+        ratio: f64,
+        flag: bool,
+        nums: Vec<i64>,
+        blob: Vec<u8>,
+        opt_some: Option<i32>,
+        opt_none: Option<i32>,
+        inner: InnerStruct,
+    }
+
+    #[derive(Debug, Deserialize, Serialize, PartialEq)]
+    struct InnerStruct {
+        x: i32,
+        y: i32,
+    }
+
+    #[test]
+    fn kv3_serialize_roundtrip() {
+        let orig = RoundTrip {
+            name: "hello".into(),
+            count: 7,
+            ratio: 1.25,
+            flag: true,
+            nums: vec![1, 2, 3, 4],
+            blob: vec![0xDE, 0xAD, 0xBE, 0xEF],
+            opt_some: Some(42),
+            opt_none: None,
+            inner: InnerStruct { x: 1, y: 2 },
+        };
+        let serialized = to_kv3_string(&orig).expect("serialize");
+        let parsed: RoundTrip = serde_kv3(&serialized)
+            .unwrap_or_else(|e| panic!("re-parse failed: {}\n--- output ---\n{}", e, serialized));
+        assert_eq!(orig, parsed);
+    }
+
+    #[test]
+    fn kv3_serialize_emits_valid_kv3_text() {
+        #[derive(Serialize)]
+        struct Sample {
+            empty_obj: EmptyInner,
+            empty_arr: Vec<i32>,
+            nested: Vec<Vec<i32>>,
+            multiline: String,
+        }
+        #[derive(Serialize)]
+        struct EmptyInner {}
+
+        let s = Sample {
+            empty_obj: EmptyInner {},
+            empty_arr: vec![],
+            nested: vec![vec![1, 2], vec![3, 4]],
+            multiline: "line1\nline2".into(),
+        };
+        let out = to_kv3_string(&s).expect("serialize");
+        // Re-parsing the output through the real parser is the strongest check.
+        assert!(
+            crate::parse_kv3(&out).is_ok(),
+            "output not parseable:\n{}",
+            out
+        );
     }
 }
