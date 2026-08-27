@@ -48,9 +48,9 @@ fn document_parser<'src>() -> impl Parser<'src, &'src str, HashMap<String, KV3Va
     let ws = any().filter(|c: &char| c.is_whitespace()).ignored();
     let pad = choice((ws, comment)).repeated();
 
-    // --- identifier-style key ---
+    // --- identifier-style key (dots allowed, e.g. `m_flags.value`) ---
     let key = any()
-        .filter(|c: &char| c.is_alphanumeric() || *c == '_')
+        .filter(|c: &char| c.is_alphanumeric() || *c == '_' || *c == '.')
         .repeated()
         .at_least(1)
         .to_slice()
