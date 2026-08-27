@@ -19,12 +19,11 @@ A Rust crate for parsing Valve's KeyValues3 (KV3) format.
 
 - **Parsing**: Parsing KV3 Format.
 - **Deserialization**: Deserialization Serde Support for the KV3 parsing.
-- **Serialization**: TODO.
-- **Support for Header Metadata**: TODO.
+- **Serialization**: Supported Serde.
 - **Support for Comments**: Handles single-line (`//`), multi-line (`/* ... */`), and XML-style (`<!-- ... -->`) comments.
 - **Support for Multiline Strings**: Parses multiline strings enclosed in triple double-quotes (`"""`).
 - **Handles Various Data Types**: Supports booleans, integers, floats, strings, arrays, hex arrays(binary blobs), objects, and null values.
-- **Customizable Parsing**: Built using the [`nom`](https://github.com/Geal/nom) parser combinator library for flexibility.
+- **Customizable Parsing**: Built using the Chumsky parser combinator.
 
 ## Installation
 
@@ -32,4 +31,4 @@ Add `kv3` to your `Cargo.toml` dependencies:
 
 ```toml
 [dependencies]
-kv3 = { version = "0.1.0", features = ["serde"] }
+kv3 = { version = "0.2.1", features = ["serde"] }
