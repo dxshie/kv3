@@ -360,6 +360,102 @@ mod tests {
     }
 
     #[derive(Debug, Deserialize, Serialize, PartialEq)]
+    struct DottedKeys {
+        #[serde(rename = "m_flags.value")]
+        flags_value: i32,
+        #[serde(rename = "some.nested.key")]
+        nested_key: String,
+        normal: i32,
+    }
+
+    #[test]
+    fn kv3_serde_parse_dotted_keys() {
+        let input = r#"
+        {
+            m_flags.value = 5
+            some.nested.key = "hello"
+            normal = 42
+        }
+        "#;
+
+        match serde_kv3::<DottedKeys>(input) {
+            Ok(data) => {
+                assert_eq!(data.flags_value, 5);
+                assert_eq!(data.nested_key, "hello");
+                assert_eq!(data.normal, 42);
+            }
+            Err(e) => {
+                error!("error {:?}", e);
+                panic!("expected to pass the test {:?}", e);
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize, Serialize, PartialEq)]
+    struct Soundevent {
+        base: String,
+        volume: f64,
+        vsnd_files: Vec<String>,
+        #[serde(rename = "track_1.vsnd_selection_type")]
+        track_1_selection: Option<String>,
+    }
+
+    #[derive(Debug, Deserialize, Serialize, PartialEq)]
+    struct SoundeventFile {
+        #[serde(rename = "Wraith.Wpn.Fire.Main")]
+        fire_main: Soundevent,
+        #[serde(rename = "Wraith.CardTrick.Proc")]
+        card_trick: Soundevent,
+    }
+
+    #[test]
+    fn kv3_serde_parse_dotted_keys_soundevents() {
+        let input = r#"
+{
+    Wraith.Wpn.Fire.Main =
+    {
+        base = "Base.Weapon.MachineGun"
+        volume = 0.0
+        volume_fade_out = 0.25
+        tail_vol_offset_db = -5.0
+        low_ammo_threshold = 8.0
+        last_shot_vol_offset_db = 3.0
+        vsnd_files =
+        [
+            "sounds/weapons/wraith/wraith_weapon_fire_main_01.vsnd",
+            "sounds/weapons/wraith/wraith_weapon_fire_main_02.vsnd",
+        ]
+    }
+    Wraith.CardTrick.Proc =
+    {
+        base = "Base.Ability"
+        volume = 4.5
+        track_1.vsnd_selection_type = "index"
+        vsnd_files =
+        [
+            "sounds/abilities/wraith/wraith_cardtrick_summon_club.vsnd",
+            "sounds/abilities/wraith/wraith_cardtrick_summon_default.vsnd",
+        ]
+        vsnd_duration = 2.223719
+    }
+}
+"#;
+
+        match serde_kv3::<SoundeventFile>(input) {
+            Ok(data) => {
+                assert_eq!(data.fire_main.base, "Base.Weapon.MachineGun");
+                assert_eq!(data.fire_main.vsnd_files.len(), 2);
+                assert_eq!(data.card_trick.volume, 4.5);
+                assert_eq!(data.card_trick.track_1_selection.as_deref(), Some("index"));
+            }
+            Err(e) => {
+                error!("error {:?}", e);
+                panic!("expected to pass the test {:?}", e);
+            }
+        }
+    }
+
+    #[derive(Debug, Deserialize, Serialize, PartialEq)]
     struct RoundTrip {
         name: String,
         count: i32,
