@@ -446,10 +446,7 @@ mod tests {
                 assert_eq!(data.fire_main.base, "Base.Weapon.MachineGun");
                 assert_eq!(data.fire_main.vsnd_files.len(), 2);
                 assert_eq!(data.card_trick.volume, 4.5);
-                assert_eq!(
-                    data.card_trick.track_1_selection.as_deref(),
-                    Some("index")
-                );
+                assert_eq!(data.card_trick.track_1_selection.as_deref(), Some("index"));
             }
             Err(e) => {
                 error!("error {:?}", e);
